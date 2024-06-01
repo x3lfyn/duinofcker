@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
 hex = "0.4.3"
 hex-literal = "0.4.1"
+rand = "0.8.5"
 sha1 = { version = "0.10.6", features = ["asm"] }
 tokio = { version = "1.38.0", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "time"] }
 tokio-macros = "2.3.0"
 tracing = "0.1.40"
-tracing-subscriber = "0.3.18"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
