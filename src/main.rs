@@ -68,8 +68,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for handle in handles {
         handle.await?;
     };
-//    println!("{:#?}", algo("5c50c5631c92a9814220b1ed3709f0f05f4a34b1", hex!("27c1005102ba5fd9bb84347546999d1a7377cfda"), 100000, precalc))
-    //println!("{:#?}", mine("205d7c95fdc2ce3e9bc682d82936ec4c4603e0c8".to_string(), "8ce9c115f23270fca847d60a4c13d597619f4a26".to_string(), 8, 305.0).await);
 
     Ok(())
 }

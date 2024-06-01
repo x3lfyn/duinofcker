@@ -9,6 +9,8 @@ use tracing::{info, trace, span, Level, Span};
 
 
 pub async fn mine(last_h: String, exp_h: String, diff: u64, target_hashrate: f64, span: Span) -> Result<(u64, f64), Box<dyn Error>> {
+    let span = span.enter();
+
     let max_hashes = 100 * diff + 1;
     let decoded_exp_h = hex::decode(exp_h)?;
 
@@ -16,33 +18,23 @@ pub async fn mine(last_h: String, exp_h: String, diff: u64, target_hashrate: f64
     let res = pow(last_h, decoded_exp_h.try_into().unwrap(), diff);
     let elapsed_time = start_time.elapsed();
 
-    span.in_scope(|| {
-        trace!("elapsed time: {:?}", elapsed_time);
-    });
+    trace!("elapsed time: {:?}", elapsed_time);
 
     let need_to_wait = if res == 0 {
-        span.in_scope(|| {
-            trace!("actual hashrate: {:.2} H/s", max_hashes as f64 / elapsed_time.as_secs_f64());
-            trace!("result is zero, waiting and returning zero hashrate(imitated hashrate is zero)");
-        });
+        trace!("actual hashrate: {:.2} H/s", max_hashes as f64 / elapsed_time.as_secs_f64());
+        trace!("result is zero, waiting and returning zero hashrate(imitated hashrate is zero)");
         Duration::from_millis((max_hashes as f64 / target_hashrate * 1000.0) as u64) - elapsed_time
     } else {
-        span.in_scope(|| {
-            trace!("actual hashrate: {:.2} H/s", res as f64 / elapsed_time.as_secs_f64());
-        });
+        trace!("actual hashrate: {:.2} H/s", res as f64 / elapsed_time.as_secs_f64());
         Duration::from_millis((res as f64 / target_hashrate * 1000.0) as u64) - elapsed_time
     };
 
-    span.in_scope(|| {
-        trace!("waiting {:?}", need_to_wait);
-    });
+    trace!("waiting {:?}", need_to_wait);
     sleep(need_to_wait).await;
 
     let imitated_hashrate = res as f64 / start_time.elapsed().as_secs_f64();
 
-    span.in_scope(|| {
-        trace!("imitated hashrate: {} H/s; delta {}", imitated_hashrate, imitated_hashrate - target_hashrate);
-    });
+    trace!("imitated hashrate: {} H/s; delta {}", imitated_hashrate, imitated_hashrate - target_hashrate);
 
     return Ok((res, imitated_hashrate));
 }
