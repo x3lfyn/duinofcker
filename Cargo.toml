@@ -1,0 +1,13 @@
+[package]
+name = "duinofcker"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hex = "0.4.3"
+hex-literal = "0.4.1"
+sha1 = { version = "0.10.6", features = ["asm"] }
+tokio = { version = "1.38.0", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "time"] }
+tokio-macros = "2.3.0"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
