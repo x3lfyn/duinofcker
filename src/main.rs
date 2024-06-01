@@ -1,18 +1,20 @@
 use tokio::time::{Duration, Instant, sleep};
 use sha1::{Sha1, Digest};
+use tokio::task::JoinHandle;
 use tokio::io::AsyncWriteExt;
+use tokio::io::AsyncReadExt;
 use hex;
 use std::error::Error;
 use tracing_subscriber::FmtSubscriber;
-use tracing::{trace, info, Level};
+use tracing::{trace, info, Level, span, instrument};
 use tokio::net::TcpStream;
 use std::str;
 
-async fn read_string_from_stream(stream: &TcpStream) -> Result<String, Box<dyn Error>> {
+async fn read_string_from_stream(stream: &mut TcpStream) -> Result<String, Box<dyn Error>> {
     stream.readable().await?;
 
     let mut buf = [0; 4096];
-    let read = stream.try_read(&mut buf)?;
+    let read = stream.read(&mut buf).await?;
     let str = str::from_utf8(&buf[..read])?;
 
     Ok(str.to_string())
@@ -62,25 +64,98 @@ async fn mine(last_h: String, exp_h: String, diff: u64, target_hashrate: f64) ->
     return Ok((res, imitated_hashrate));
 }
 
+#[instrument]
+async fn emulator(id: String, target_hashrate: f64, ducoid: String) -> Result<(), Box<dyn Error>> {
+//    let _span_ = span!(Level::INFO, id.clone()).entered();
+
+    let mut stream = TcpStream::connect("212.132.102.74:8500").await?;
+    let server_version = read_string_from_stream(&mut stream).await?;
+    info!("server version: {}", &server_version[0..server_version.len() - 1]);
+
+    loop {
+        stream.writable().await?;
+        stream.write_all("JOB,kadyklesha,AVR,lalala\n".as_bytes()).await?;
+        let job = read_string_from_stream(&mut stream).await?;
+        info!("got job: {}", &job[0..job.len() - 1]);
+
+        let parts = job[0..job.len()-1].split(",").collect::<Vec<&str>>();
+        let last_h = parts[0];
+        let exp_h = parts[1];
+        let diff = parts[2].parse::<u64>()?;
+
+        let (res, hashrate) = mine(last_h.to_string(), exp_h.to_string(), diff, target_hashrate).await?;
+        
+        let ans = format!("{},{:.2},Official AVR Miner 4.0,{},{}", res, hashrate, id, ducoid);
+        trace!("sending: {}", ans);
+
+        stream.writable().await?;
+        stream.write_all(ans.as_bytes()).await?;
+        let status = read_string_from_stream(&mut stream).await?;
+        info!("got answer: {}", &status[0..status.len() - 1]);
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default subscriber failed");
 
-    let mut stream = TcpStream::connect("212.132.102.74:8500").await?;
-    let server_version = read_string_from_stream(&stream).await?;
-    info!("server version: {}", &server_version[0..server_version.len() - 1]);
+    let mut handles: Vec<JoinHandle<()>> = vec![];
 
-    stream.writable().await?;
-    stream.write_all("JOB,nyaaa,AVR,lalala\r\n".as_bytes()).await?;
-    let job = read_string_from_stream(&stream).await?;
-    info!("got job: {}", &job[0..server_version.len() - 1]);
+    for i in 0..10 {
+        let handle = tokio::spawn(async move {
+            let ducoids = vec![
+                "DUCOID84e128aa5745db73".to_string(),
+                "DUCOID40d745e4c4ca8b7c".to_string(),
+                "DUCOID97ce67ac2a199f01".to_string(),
+                "DUCOID29d6372681217a57".to_string(),
+                "DUCOID44f1de2a1625c3f9".to_string(),
+                "DUCOID1069e9ac5a23eed0".to_string(),
+                "DUCOID1287436fbf3404e3".to_string(),
+                "DUCOID2086b65f3c661ea0".to_string(),
+                "DUCOID657ce340551a2a90".to_string(),
+                "DUCOID3b093cf4e71ae617".to_string()
+            ];
+
+            let ids = vec![
+                "my01".to_string(),
+                "my02".to_string(),
+                "my03".to_string(),
+                "my04".to_string(),
+                "my05".to_string(),
+                "my06".to_string(),
+                "my07".to_string(),
+                "my08".to_string(),
+                "my09".to_string(),
+                "my10".to_string(),
+            ];
+
+            let hashrates = vec![
+                298.4,
+                295.2,
+                300.1,
+                290.4,
+                302.1,
+                310.5,
+                304.7,
+                300.0,
+                297.9,
+                308.7
+            ];
+
+            let _ = emulator(ids[i].clone(), hashrates[i], ducoids[i].clone()).await;
+        });
+        handles.push(handle);
+    }
     
+    for handle in handles {
+        handle.await?;
+    };
 //    println!("{:#?}", algo("5c50c5631c92a9814220b1ed3709f0f05f4a34b1", hex!("27c1005102ba5fd9bb84347546999d1a7377cfda"), 100000, precalc))
-    println!("{:#?}", mine("205d7c95fdc2ce3e9bc682d82936ec4c4603e0c8".to_string(), "8ce9c115f23270fca847d60a4c13d597619f4a26".to_string(), 8, 305.0).await);
+    //println!("{:#?}", mine("205d7c95fdc2ce3e9bc682d82936ec4c4603e0c8".to_string(), "8ce9c115f23270fca847d60a4c13d597619f4a26".to_string(), 8, 305.0).await);
 
     Ok(())
 }
